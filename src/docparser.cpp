@@ -301,30 +301,16 @@ static std::string doConvertFile(const std::string &filename, std::string suffix
 }
 
 /**
- * @brief Convert file with truncation support
+ * @brief Helper function to convert file with truncation for a given suffix
  * @param filename Path to the file
+ * @param suffix File extension to use
  * @param maxBytes Maximum bytes to process
- * @return Converted text content (potentially truncated)
+ * @return Converted text content (potentially truncated), or empty string if failed
  */
-static std::string doConvertFileWithTruncation(const std::string &filename, size_t maxBytes)
+static std::string tryConvertWithTruncation(const std::string &filename, const std::string &suffix, size_t maxBytes)
 {
-    std::string suffix = extractFileExtension(filename);
-    if (suffix.empty()) {
-        return {};
-    }
-
     std::unique_ptr<fileext::FileExtension> document = createParser(filename, suffix);
     if (!document) {
-        // Try similar extensions
-        static const std::unordered_map<std::string, std::string> similarExtensionMap = createSimilarExtensionMap();
-        auto it = similarExtensionMap.find(suffix);
-        if (it != similarExtensionMap.end()) {
-            document = createParser(filename, it->second);
-        }
-    }
-
-    if (!document) {
-        std::cerr << "ERROR: [doConvertFileWithTruncation] Unsupported file extension: " << filename << std::endl;
         return {};
     }
 
@@ -337,22 +323,51 @@ static std::string doConvertFileWithTruncation(const std::string &filename, size
 
         // Get result and add truncation marker if needed
         std::string result = std::move(document->m_text);
-        
+
         // Fallback truncation: if the result still exceeds maxBytes, do final truncation
         if (result.size() > maxBytes) {
             result = document->applyFinalTruncation(result, maxBytes);
             document->markAsTruncated();
         }
-        
+
         if (document->isTruncated()) {
             result += "\n[CONTENT_TRUNCATED]";
         }
-        
+
         return result;
     } catch (const std::logic_error &error) {
         std::cout << error.what() << std::endl;
     } catch (...) {
         std::cerr << "Parse failed: " << filename << std::endl;
+    }
+
+    return {};
+}
+
+/**
+ * @brief Convert file with truncation support
+ * @param filename Path to the file
+ * @param maxBytes Maximum bytes to process
+ * @return Converted text content (potentially truncated)
+ */
+static std::string doConvertFileWithTruncation(const std::string &filename, size_t maxBytes)
+{
+    std::string suffix = extractFileExtension(filename);
+    if (suffix.empty()) {
+        return {};
+    }
+
+    // Try converting with the original suffix first
+    std::string content = tryConvertWithTruncation(filename, suffix, maxBytes);
+    if (!content.empty()) {
+        return content;
+    }
+
+    // If content is empty, try similar extensions
+    static const std::unordered_map<std::string, std::string> similarExtensionMap = createSimilarExtensionMap();
+    auto it = similarExtensionMap.find(suffix);
+    if (it != similarExtensionMap.end()) {
+        return tryConvertWithTruncation(filename, it->second, maxBytes);
     }
 
     return {};

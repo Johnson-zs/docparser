@@ -1,3 +1,9 @@
+docparser (1.0.24) unstable; urgency=medium
+
+  * improve file conversion fallback logic for truncated files
+
+ -- Zhang Sheng <zhangsheng@uniontech.com>  Fri, 28 Nov 2025 16:14:02 +0800
+
 docparser (1.0.23) unstable; urgency=medium
 
   * add defensive checks in excel formula evaluation
